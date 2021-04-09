@@ -2,6 +2,7 @@ const multer = require('multer')
 var path = require('path')
 var fs = require('fs')
 const request = require('request')
+const superagent = require('superagent')
 
 var tweet
 module.exports = (app) => {
@@ -92,10 +93,10 @@ module.exports = (app) => {
     })
 
   //  console.log('envv', process.env)
-    if(process.env.CONSUMER_KEY) {
-     const upload = multer({ storage: storage });
-     app.post("/image", upload.single('previewImage'), (req, res) => {
-       console.log('UPLOADING');
+    const upload = multer({ storage: storage });
+    app.post("/image", upload.single('previewImage'), (req, res) => {
+      if(process.env.CONSUMER_KEY) {
+        console.log('UPLOADING');
        findParentTweet(req.query.sketch_id, function(err, tweet_id){
          if(err) console.log(err)
          console.log('posting image');
@@ -130,40 +131,57 @@ module.exports = (app) => {
 
 
       // res.end();
-     });
-
-    function findParentTweet(sketch_id, callback) {
-      db.find({_id: sketch_id}, function (err, entries){
-       if(err){
-         callback(err, null)
-       } else {
-         if(entries.length > 0){
-           if(entries[0].parent) {
-               db.find({_id: entries[0].parent}, function (err, entries){
-                 if(err){
-                   callback(err)
-                 } else {
-                   if(entries.length > 0){
-                     if(entries[0].tweet_id) {
-                       callback(null, entries[0].tweet_id)
+      function findParentTweet(sketch_id, callback) {
+        db.find({_id: sketch_id}, function (err, entries){
+         if(err){
+           callback(err, null)
+         } else {
+           if(entries.length > 0){
+             if(entries[0].parent) {
+                 db.find({_id: entries[0].parent}, function (err, entries){
+                   if(err){
+                     callback(err)
+                   } else {
+                     if(entries.length > 0){
+                       if(entries[0].tweet_id) {
+                         callback(null, entries[0].tweet_id)
+                       } else {
+                         callback(null, null)
+                       }
                      } else {
                        callback(null, null)
                      }
-                   } else {
-                     callback(null, null)
                    }
-                 }
-               })
+                 })
+             } else {
+               callback(null, null)
+             }
            } else {
              callback(null, null)
            }
-         } else {
-           callback(null, null)
          }
-       }
-     })
-    }
-    }
+       })
+      }
+      }
+      if(process.env.CHEVERETO_API_KEY && process.env.CHEVERETO_API_URL) {
+        console.log('UPLOADING TO CHEVERETO');
+        superagent
+          .post(process.env.CHEVERETO_API_URL)
+          .field('key', process.env.CHEVERETO_API_KEY)
+          .attach('source', req.file.path, {filename: `${req.query.name}: ${req.query.sketch_id}`})
+          .end((err, res) => {
+            if (err) {
+              console.log(err)
+            } else {
+              console.log('Media uploaded!')
+              db.update(
+                { _id: req.query.sketch_id },
+                { $set: { name: req.query.name, chevereto_url: res.body.image.url }
+              }, {}, function (err, numReplaced) {});
+            }
+          });
+      }
+    });
 
      function saveFile(body, fileName) {
        const file = fs.createWriteStream(fileName)
