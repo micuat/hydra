@@ -1,5 +1,6 @@
 const request = require('superagent')
 const examples = require('./examples.json')
+const html2canvas = require('html2canvas')
 const sketches = []
 
 
@@ -192,35 +193,52 @@ class Gallery {
   shareSketch(code, hydra, name) {
     this.saveSketch(code, () => {
       console.log("URL is", this.url, 'sketch is', this.current)
-      hydra.getScreenImage((img) => {
-        request
-          .post('/image')
-          .attach('previewImage', img)
-          .query({
-            url: this.url,
-            sketch_id: this.current.sketch_id,
-            name: name
-          })
-          // .send({
-          //   code: base64
-          // })
-        //  .query(query)
-          .end((err, res) => {
-            if(err) {
-              console.log('error postingimage', err)
-            } else {
-              console.log('image response', res.text)
-            //  self.setToURL([ { label: 'sketch_id', value: res.text}, {label: 'code', value: base64} ])
+      const ec = document.querySelector("#editor-container");
+      ec.style.backgroundColor = "#000";
+      html2canvas(ec).then(canvas => {
+        ec.style.backgroundColor = "rgba(0,0,0,0)";
+        hydra.getScreenImage((hydraBlob) => {
+          let hydraImg = new Image();
+          hydraImg.onload = () => {
+            const layeredCanvas = document.createElement("canvas");
+            layeredCanvas.width = canvas.width;
+            layeredCanvas.height = canvas.height;
+            layeredCanvas.getContext('2d').drawImage(hydraImg, 0, 0, layeredCanvas.width, layeredCanvas.height);
+            layeredCanvas.getContext('2d').globalCompositeOperation = "difference";
+            layeredCanvas.getContext('2d').drawImage(canvas, 0, 0);
+            layeredCanvas.toBlob( (img) => {
+              request
+                .post('/image')
+                .attach('previewImage', img)
+                .query({
+                  url: this.url,
+                  sketch_id: this.current.sketch_id,
+                  name: name
+                })
+                // .send({
+                //   code: base64
+                // })
+              //  .query(query)
+                .end((err, res) => {
+                  if(err) {
+                    console.log('error postingimage', err)
+                  } else {
+                    console.log('image response', res.text)
+                  //  self.setToURL([ { label: 'sketch_id', value: res.text}, {label: 'code', value: base64} ])
 
-            }
-          })
-        // var oReq = new XMLHttpRequest();
-        // oReq.open("POST", "https://localhost:8000/image", true);
-        // oReq.onload = function (oEvent) {
-        //   // Uploaded.
-        //   console.log("uploaded", oEvent)
-        // };
-        // oReq.send(img);
+                  }
+                })
+              // var oReq = new XMLHttpRequest();
+              // oReq.open("POST", "https://localhost:8000/image", true);
+              // oReq.onload = function (oEvent) {
+              //   // Uploaded.
+              //   console.log("uploaded", oEvent)
+              // };
+              // oReq.send(img);
+            });
+          };
+          hydraImg.src = URL.createObjectURL(hydraBlob);
+        });
       //  console.log('got image', img)
       })
     })
