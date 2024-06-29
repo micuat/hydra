@@ -14,8 +14,10 @@
   "dependencies": {
     "@codemirror/lang-javascript": "^6.1.9",
     "@codemirror/theme-one-dark": "^6.1.2",
+    "@emotion/css": "^11.11.2",
     "@lezer/highlight": "^1.1.6",
     "@management/cm-evaluate": "^0.1.0",
+    "@techstark/opencv-js": "4.8.0-release.1",
     "acorn": "^8.7.0",
     "astravel": "^0.5.0",
     "astring": "^1.4.0",
